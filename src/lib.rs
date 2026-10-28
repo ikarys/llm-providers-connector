@@ -1,16 +1,20 @@
-//! Talking to OpenAI-compatible model endpoints and owning the per-model
-//! parameters for a call.
+//! Talking to OpenAI-compatible model providers, owning the per-model
+//! parameters for a call, and sealing provider API keys at rest.
 //!
-//! Fennec-free: this crate knows only the wire protocol and the shape of
-//! model preferences; it does not know fennec's domains, store, or web API.
+//! This crate knows only the wire protocol, provider shape, and model
+//! preferences; it does not know a host app's store or web API.
 
 mod chat;
 mod endpoint;
 mod listing;
 mod params;
+mod provider;
+mod secret;
 mod sse;
 
 pub use chat::{ChatRequest, Completion, Delta, StreamedToolCall, stream};
 pub use endpoint::Endpoint;
 pub use listing::{ListedModel, list_models};
 pub use params::{ModelParams, ModelPrefs, ReasoningEffort};
+pub use provider::{ApiKey, ModelRef, Provider};
+pub use secret::MasterKey;

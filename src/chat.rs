@@ -56,14 +56,9 @@ pub struct Completion {
     pub completion_tokens: u64,
 }
 
-/// Streams one chat completion, forwarding deltas to `on` and returning the
-/// accumulated completion.
-pub fn stream(
-    endpoint: &Endpoint,
-    req: &ChatRequest,
-    stop: &AtomicBool,
-    on: &mut dyn FnMut(Delta),
-) -> Result<Completion, String> {
+/// The request body. Its bytes are the server's prompt cache key: the same
+/// request must serialize identically from one fennec version to the next.
+fn body(req: &ChatRequest) -> Value {
     let mut messages = vec![json!({"role": "system", "content": req.system_prompt})];
     messages.extend_from_slice(req.messages);
     let mut body = json!({
@@ -80,6 +75,18 @@ pub fn stream(
         body["tools"] = req.tools.clone();
         body["tool_choice"] = json!("auto");
     }
+    body
+}
+
+/// Streams one chat completion, forwarding deltas to `on` and returning the
+/// accumulated completion.
+pub fn stream(
+    endpoint: &Endpoint,
+    req: &ChatRequest,
+    stop: &AtomicBool,
+    on: &mut dyn FnMut(Delta),
+) -> Result<Completion, String> {
+    let body = body(req);
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .http_status_as_error(false)
         .build()
@@ -97,4 +104,29 @@ pub fn stream(
         return Err(format!("LLM HTTP {status}: {text}"));
     }
     super::sse::parse(BufReader::new(body.into_reader()), stop, on)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The exact bytes sent today. A change here voids every session's prompt
+    /// cache on the next call: update it only on purpose.
+    #[test]
+    fn the_request_body_bytes_are_stable() {
+        let messages = [json!({"role": "user", "content": "hi"})];
+        let tools = json!([{"type": "function", "function": {"name": "read_file"}}]);
+        let req = ChatRequest {
+            model: "qwen3.8-27b",
+            system_prompt: "You are fennec.",
+            messages: &messages,
+            tools: &tools,
+            max_tokens: 32_000,
+            reasoning_effort: Some(ReasoningEffort::XHigh),
+        };
+        assert_eq!(
+            serde_json::to_string(&body(&req)).unwrap(),
+            r#"{"max_tokens":32000,"messages":[{"content":"You are fennec.","role":"system"},{"content":"hi","role":"user"}],"model":"qwen3.8-27b","reasoning_effort":"xhigh","stream":true,"stream_options":{"include_usage":true},"tool_choice":"auto","tools":[{"function":{"name":"read_file"},"type":"function"}]}"#
+        );
+    }
 }
