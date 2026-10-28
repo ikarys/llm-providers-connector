@@ -1,7 +1,9 @@
-//! The per-model parameters a turn runs with, kept separate from fennec's
-//! settings so other products can reuse the same precedence and wire names.
+//! The per-model parameters a turn runs with, kept independent of any host
+//! app so other products can reuse the same precedence and wire names.
 
 use serde::{Deserialize, Serialize};
+
+use crate::provider::ModelRef;
 
 /// openfox `ReasoningEffort`: how much a model may think.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,6 +35,8 @@ pub struct ModelPrefs {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelParams {
+    /// The provider the model belongs to.
+    pub provider: String,
     pub model: String,
     pub max_tokens: u32,
     pub context_window: u64,
@@ -41,18 +45,20 @@ pub struct ModelParams {
 }
 
 impl ModelParams {
-    /// Chooses the concrete parameters for `model`.
+    /// Chooses the concrete parameters for `selected`.
     ///
     /// Precedence: per-model preferences > `defaults`. The context window
     /// additionally falls back to the endpoint's current listing before the
     /// built-in default.
     pub fn resolve(
         defaults: &ModelParams,
-        model: String,
+        selected: ModelRef,
         prefs: Option<&ModelPrefs>,
         listed_window: Option<u64>,
     ) -> ModelParams {
         ModelParams {
+            provider: selected.provider,
+            model: selected.model,
             max_tokens: prefs
                 .and_then(|p| p.max_tokens)
                 .unwrap_or(defaults.max_tokens),
@@ -66,7 +72,6 @@ impl ModelParams {
             reasoning_effort: prefs
                 .and_then(|p| p.reasoning_effort)
                 .or(defaults.reasoning_effort),
-            model,
         }
     }
 }
