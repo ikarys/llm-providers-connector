@@ -3,6 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::price::Price;
 use crate::provider::ModelRef;
 
 /// openfox `ReasoningEffort`: how much a model may think.
@@ -29,6 +30,8 @@ pub struct ModelPrefs {
     pub compaction_threshold: Option<f64>,
     /// openfox `reasoningEffort`; `None` sends no `reasoning_effort` field.
     pub reasoning_effort: Option<ReasoningEffort>,
+    /// What the model's tokens cost; none means the model has no price (a local model, or not set).
+    pub price: Option<Price>,
 }
 
 /// The concrete parameters one turn runs with.

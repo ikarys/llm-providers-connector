@@ -108,6 +108,7 @@ mod tests {
 
     fn valid_prefs() -> ModelPrefs {
         ModelPrefs {
+            price: None,
             max_tokens: Some(1),
             context_window: Some(1024),
             compaction_threshold: Some(1.0),
