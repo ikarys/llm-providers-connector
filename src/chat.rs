@@ -10,6 +10,7 @@ use super::params::ReasoningEffort;
 use serde_json::{Value, json};
 use std::io::BufReader;
 use std::sync::atomic::AtomicBool;
+use std::time::Duration;
 
 /// What the stream yields while it runs (openfox `StreamEvent`).
 #[derive(Debug, PartialEq)]
@@ -89,6 +90,9 @@ pub fn stream(
     let body = body(req);
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .http_status_as_error(false)
+        // An endpoint that is down otherwise hangs each attempt for the OS's
+        // TCP timeout (about two minutes) before the turn can report it.
+        .timeout_connect(Some(Duration::from_secs(10)))
         .build()
         .into();
     let url = endpoint.url("chat/completions");
