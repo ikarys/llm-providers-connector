@@ -1,7 +1,7 @@
-//! Port of openfox `llm/client.ts`: one streaming call to an
-//! OpenAI-compatible `/chat/completions` endpoint.
+//! One streaming call to an OpenAI-compatible `/chat/completions`
+//! endpoint.
 //!
-//! Not ported yet: the provider shims of openfox `requestBody`
+//! This module sends no provider shims in the request body
 //! (llama.cpp `chat_template_kwargs.thinking`, Qwen3 `enable_thinking`);
 //! the standard `reasoning_effort` field is sent when set.
 
@@ -12,7 +12,7 @@ use std::io::BufReader;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
-/// What the stream yields while it runs (openfox `StreamEvent`).
+/// What the stream yields while it runs (`StreamEvent`).
 #[derive(Debug, PartialEq)]
 pub enum Delta {
     Text(String),

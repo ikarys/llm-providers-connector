@@ -1,5 +1,5 @@
-//! Port of openfox `llm/streaming.ts`: reads an SSE chat-completion stream,
-//! accumulating tool-call fragments by index as the OpenAI protocol sends them.
+//! Reads an SSE chat-completion stream, accumulating tool-call fragments
+//! by index as the OpenAI protocol sends them.
 
 use super::chat::{Completion, Delta, StreamedToolCall};
 use serde_json::Value;
@@ -138,7 +138,7 @@ where
             first_token_seen = true;
         }
         let delta = &choice["delta"];
-        // Same field precedence as openfox `getThinking`.
+        // Same field precedence as the thinking delta below.
         let thinking = ["reasoning", "reasoning_content", "thinking"]
             .iter()
             .find_map(|k| delta[k].as_str());

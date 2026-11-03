@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::price::Price;
 use crate::provider::ModelRef;
 
-/// openfox `ReasoningEffort`: how much a model may think.
+/// `ReasoningEffort`: how much a model may think.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReasoningEffort {
@@ -24,11 +24,11 @@ pub enum ReasoningEffort {
 #[serde(rename_all = "camelCase", default)]
 pub struct ModelPrefs {
     pub max_tokens: Option<u32>,
-    /// openfox `contextWindow`; overrides what the endpoint lists.
+    /// `contextWindow`; overrides what the endpoint lists.
     pub context_window: Option<u64>,
-    /// openfox `compactionThreshold`; 0 disables compaction.
+    /// `compactionThreshold`; 0 disables compaction.
     pub compaction_threshold: Option<f64>,
-    /// openfox `reasoningEffort`; `None` sends no `reasoning_effort` field.
+    /// `reasoningEffort`; `None` sends no `reasoning_effort` field.
     pub reasoning_effort: Option<ReasoningEffort>,
     /// What the model's tokens cost; none means the model has no price (a local model, or not set).
     pub price: Option<Price>,
@@ -84,7 +84,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reasoning_effort_uses_openfox_wire_names() {
+    fn reasoning_effort_wire_names_are_stable() {
         assert_eq!(
             serde_json::to_string(&ReasoningEffort::XHigh).unwrap(),
             "\"xhigh\""

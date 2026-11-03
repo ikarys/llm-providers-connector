@@ -1,15 +1,15 @@
-//! Port of openfox `providers/auto-config.ts`, for an endpoint that does not
-//! list its models' limits (no `/models` route, no `max_model_len`): which
-//! reasoning efforts the model accepts (`probeReasoningEfforts`), and its
-//! context window from the catalog (`detectModelInfo`'s `known` table).
+//! Auto-config for an endpoint that does not list its models' limits
+//! (no `/models` route, no `max_model_len`): which reasoning efforts the
+//! model accepts, and its context window from the catalog.
 //!
-//! fennec additions: the limits an endpoint names when refusing an oversized
-//! `max_tokens` (read from error wording, so indicative), preferred to the
-//! catalog. The effort probes ask for `max_tokens: 1`, not openfox's 0, which
-//! some gateways refuse.
-//! Not ported: thinking/non-thinking param combos, rejected-param detection,
-//! reasoning in history, the ollama/llama.cpp/LM Studio native routes: fennec's
-//! request has no per-model extra params to put them in yet.
+//! The limits an endpoint names when refusing an oversized `max_tokens`
+//! (read from error wording, so indicative) are preferred to the catalog.
+//! The effort probes ask for `max_tokens: 1`, not 0, which some gateways
+//! refuse.
+//! This module does not handle thinking/non-thinking param combos,
+//! rejected-param detection, reasoning in history, or the ollama/llama.cpp/LM
+//! Studio native routes: its request has no per-model extra params to put
+//! them in yet.
 
 use super::catalog::catalog_entry;
 use super::endpoint::Endpoint;
@@ -18,7 +18,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 use std::time::Duration;
 
-/// openfox `REASONING_EFFORT_CANDIDATES` ('none' is the non-thinking path).
+/// The efforts tried in turn ('none' is the non-thinking path).
 const EFFORT_CANDIDATES: [ReasoningEffort; 5] = [Low, Medium, High, XHigh, Max];
 
 /// Asked for in the oversized call: far above any model's limit, so the
@@ -53,7 +53,7 @@ pub struct ProbedModel {
     pub default_reasoning_effort: Option<ReasoningEffort>,
 }
 
-/// Probes `model` (openfox `autoConfig`, one model). Fails only when the
+/// Probes one `model`. Fails only when the
 /// model cannot be called at all.
 pub fn probe_model(endpoint: &Endpoint, model: &str) -> Result<ProbedModel, String> {
     let baseline =
@@ -124,7 +124,7 @@ pub fn probe_model(endpoint: &Endpoint, model: &str) -> Result<ProbedModel, Stri
     Ok(probed)
 }
 
-/// openfox `probeReasoningEfforts`' dedup: an effort that changes the prompt
+/// The probe's dedup: an effort that changes the prompt
 /// (a distinct `prompt_tokens`) is a real level; efforts that map to the same
 /// prompt are one level, the first named kept.
 fn distinct_efforts(baseline: u64, accepted: &[(ReasoningEffort, u64)]) -> Vec<ReasoningEffort> {

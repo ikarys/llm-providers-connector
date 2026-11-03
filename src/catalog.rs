@@ -1,12 +1,12 @@
-//! Port of openfox `providers/model-catalog.ts` and the `known` table of
-//! `providers/auto-config.ts`: what well-known model families advertise, for
-//! an endpoint that does not say (no `/models`, no `max_model_len`).
+//! Model catalog and `known` table: what well-known model families
+//! advertise, for an endpoint that does not say (no `/models`, no
+//! `max_model_len`).
 //!
-//! Matching differs from openfox's regexes: the id is normalized first
-//! (gateway prefixes such as Databricks' `system.ai.` / `databricks-` and an
-//! org path dropped, dots read as dashes), then matched by family prefix, so
+//! Matching normalizes the id first (gateway prefixes such as Databricks'
+//! `system.ai.` / `databricks-` and an org path dropped, dots read as
+//! dashes), then matches by family prefix, so
 //! `databricks-deepseek-v4-1-flash-1017` is a DeepSeek V4.
-//! Not ported: vision support (fennec does not gate images per model).
+//! This module does not gate images per model.
 
 use super::params::ReasoningEffort::{self, *};
 
