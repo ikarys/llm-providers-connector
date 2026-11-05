@@ -3,6 +3,8 @@
 //!
 //! This crate knows only the wire protocol, provider shape, and model
 //! preferences; it does not know a host app's store or web API.
+//!
+#![doc = include_str!("../README.md")]
 
 mod catalog;
 mod chat;

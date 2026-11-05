@@ -35,7 +35,7 @@ pub struct ChatRequest<'a> {
     pub reasoning_effort: Option<ReasoningEffort>,
 }
 
-/// A tool call as streamed, before fennec's policy parses its arguments.
+/// A tool call as streamed, before the caller parses its arguments.
 #[derive(Debug, Clone, PartialEq)]
 pub struct StreamedToolCall {
     /// May be empty; the caller decides what to do about it.
@@ -58,7 +58,7 @@ pub struct Completion {
 }
 
 /// The request body. Its bytes are the server's prompt cache key: the same
-/// request must serialize identically from one fennec version to the next.
+/// request must serialize identically from one version of the caller to the next.
 fn body(req: &ChatRequest) -> Value {
     let mut messages = vec![json!({"role": "system", "content": req.system_prompt})];
     messages.extend_from_slice(req.messages);
@@ -122,7 +122,7 @@ mod tests {
         let tools = json!([{"type": "function", "function": {"name": "read_file"}}]);
         let req = ChatRequest {
             model: "qwen3.8-27b",
-            system_prompt: "You are fennec.",
+            system_prompt: "You are a helpful assistant.",
             messages: &messages,
             tools: &tools,
             max_tokens: 32_000,
@@ -130,7 +130,7 @@ mod tests {
         };
         assert_eq!(
             serde_json::to_string(&body(&req)).unwrap(),
-            r#"{"max_tokens":32000,"messages":[{"content":"You are fennec.","role":"system"},{"content":"hi","role":"user"}],"model":"qwen3.8-27b","reasoning_effort":"xhigh","stream":true,"stream_options":{"include_usage":true},"tool_choice":"auto","tools":[{"function":{"name":"read_file"},"type":"function"}]}"#
+            r#"{"max_tokens":32000,"messages":[{"content":"You are a helpful assistant.","role":"system"},{"content":"hi","role":"user"}],"model":"qwen3.8-27b","reasoning_effort":"xhigh","stream":true,"stream_options":{"include_usage":true},"tool_choice":"auto","tools":[{"function":{"name":"read_file"},"type":"function"}]}"#
         );
     }
 }
