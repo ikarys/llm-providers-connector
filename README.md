@@ -19,7 +19,7 @@ Not on crates.io yet. Pin the git tag:
 
 ```toml
 [dependencies]
-llm-providers-connector = { git = "https://github.com/ikarys/llm-providers-connector", tag = "v0.1.0" }
+llm-providers-connector = { git = "https://github.com/ikarys/llm-providers-connector", tag = "v0.1.1" }
 ```
 
 ## What is in the box

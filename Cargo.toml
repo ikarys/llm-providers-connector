@@ -1,6 +1,6 @@
 [package]
 name = "llm-providers-connector"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "AGPL-3.0-only"
 description = "Sync client for OpenAI-compatible LLM endpoints: streaming chat with tools, model listing and probing, prices, API keys sealed at rest."
