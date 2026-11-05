@@ -1,11 +1,13 @@
 [package]
-name = "llm-providers"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-
-[lib]
-name = "llm_providers"
+name = "llm-providers-connector"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+description = "Sync client for OpenAI-compatible LLM endpoints: streaming chat with tools, model listing and probing, prices, API keys sealed at rest."
+repository = "https://github.com/ikarys/llm-providers-connector"
+readme = "README.md"
+keywords = ["llm", "openai", "client"]
+categories = ["api-bindings"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
