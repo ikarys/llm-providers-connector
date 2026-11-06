@@ -175,4 +175,4 @@ CI runs lint and tests on every push and pull request.
 
 ## License
 
-AGPL-3.0-only.
+MIT. See [LICENSE](LICENSE).
