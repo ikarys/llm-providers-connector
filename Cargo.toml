@@ -1,6 +1,6 @@
 [package]
 name = "llm-providers-connector"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 license = "MIT"
 description = "Sync client for OpenAI-compatible LLM endpoints: streaming chat with tools, model listing and probing, prices, API keys sealed at rest."
