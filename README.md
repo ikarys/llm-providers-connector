@@ -118,7 +118,9 @@ windows; it is a fallback, not a source of truth.
 
 A `Provider` is one endpoint plus the models it serves, each with optional
 `ModelPrefs` (max tokens, context window, compaction threshold, reasoning
-effort, price). A `ModelRef { provider, model }` names the model in use.
+effort, the efforts a probe found, price). `ModelPrefs::accepted_efforts`
+gives the efforts to offer for a model: the probed ones, else the catalog's.
+A `ModelRef { provider, model }` names the model in use.
 `ModelParams::resolve` turns defaults, preferences and the listed context
 window into the concrete parameters of one call.
 

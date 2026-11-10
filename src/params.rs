@@ -3,6 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::catalog::catalog_entry;
 use crate::price::Price;
 use crate::provider::ModelRef;
 
@@ -30,8 +31,25 @@ pub struct ModelPrefs {
     pub compaction_threshold: Option<f64>,
     /// `reasoningEffort`; `None` sends no `reasoning_effort` field.
     pub reasoning_effort: Option<ReasoningEffort>,
+    /// `reasoningEfforts`: the efforts the model accepts, as a probe found
+    /// them; empty when never probed.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub reasoning_efforts: Vec<ReasoningEffort>,
     /// What the model's tokens cost; none means the model has no price (a local model, or not set).
     pub price: Option<Price>,
+}
+
+impl ModelPrefs {
+    /// The efforts `model_id` accepts: the probed ones, else its catalog
+    /// family's; empty when neither knows (any effort may be offered).
+    pub fn accepted_efforts(prefs: Option<&ModelPrefs>, model_id: &str) -> Vec<ReasoningEffort> {
+        match prefs.filter(|p| !p.reasoning_efforts.is_empty()) {
+            Some(p) => p.reasoning_efforts.clone(),
+            None => catalog_entry(model_id)
+                .map(|entry| entry.reasoning_efforts.to_vec())
+                .unwrap_or_default(),
+        }
+    }
 }
 
 /// The concrete parameters one turn runs with.
@@ -96,6 +114,35 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&ReasoningEffort::Minimal).unwrap(),
             "\"minimal\""
+        );
+    }
+
+    #[test]
+    fn accepted_efforts_prefer_the_probe_then_the_catalog() {
+        let probed = ModelPrefs {
+            reasoning_efforts: vec![ReasoningEffort::Low, ReasoningEffort::High],
+            ..ModelPrefs::default()
+        };
+        assert_eq!(
+            ModelPrefs::accepted_efforts(Some(&probed), "anything"),
+            vec![ReasoningEffort::Low, ReasoningEffort::High]
+        );
+        assert_eq!(
+            ModelPrefs::accepted_efforts(None, "gpt-5"),
+            catalog_entry("gpt-5").unwrap().reasoning_efforts.to_vec()
+        );
+        assert!(ModelPrefs::accepted_efforts(None, "no-such-family").is_empty());
+    }
+
+    #[test]
+    fn unprobed_prefs_serialize_without_the_efforts_field() {
+        let json = serde_json::to_string(&ModelPrefs::default()).unwrap();
+        assert!(!json.contains("reasoningEfforts"));
+        let back: ModelPrefs =
+            serde_json::from_str(r#"{"reasoningEfforts":["low","max"]}"#).unwrap();
+        assert_eq!(
+            back.reasoning_efforts,
+            vec![ReasoningEffort::Low, ReasoningEffort::Max]
         );
     }
 }

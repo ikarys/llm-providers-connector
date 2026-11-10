@@ -113,6 +113,7 @@ mod tests {
             context_window: Some(1024),
             compaction_threshold: Some(1.0),
             reasoning_effort: None,
+            reasoning_efforts: Vec::new(),
         }
     }
 
