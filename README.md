@@ -19,7 +19,7 @@ Not on crates.io yet. Pin the git tag:
 
 ```toml
 [dependencies]
-llm-providers-connector = { git = "https://github.com/ikarys/llm-providers-connector", tag = "v0.1.4" }
+llm-providers-connector = { git = "https://github.com/ikarys/llm-providers-connector", tag = "v0.2.0" }
 ```
 
 ## What is in the box
@@ -29,8 +29,7 @@ llm-providers-connector = { git = "https://github.com/ikarys/llm-providers-conne
 | Point at a server | `Endpoint { base_url, api_key }` |
 | Stream a chat completion | `stream`, `ChatRequest`, `Delta`, `Completion`, `StreamedToolCall` |
 | Know which models a server has | `list_models` → `ListedModel` |
-| Learn a model's limits by asking the server | `probe_model` → `ProbedModel`, `LimitSource` |
-| Built-in knowledge of public model families | `catalog_entry` → `CatalogEntry` |
+| Learn a model's limits by asking the server | `probe_model` → `ProbedModel` |
 | Describe providers and the model in use | `Provider`, `ModelRef`, `ApiKey`, `ModelPrefs`, `ModelParams`, `ReasoningEffort` |
 | Put a price on tokens | `Price`, `Cost` |
 | Keep API keys unreadable in a copied database | `MasterKey` |
@@ -84,7 +83,7 @@ messages) keeps hitting the cache from one call to the next.
 Reasoning models: set `max_tokens` generously. The thinking counts against it,
 and a tight budget returns an empty `content` with the reasoning in `thinking`.
 
-## Models: list, probe, catalog
+## Models: list and probe
 
 Local servers list their models but rarely say what they can do.
 `list_models` asks the endpoint (vLLM's `max_model_len` is read when present);
@@ -92,34 +91,32 @@ Local servers list their models but rarely say what they can do.
 requests, reading the limits the server names in its error messages.
 
 ```rust,no_run
-use llm_providers_connector::{Endpoint, catalog_entry, list_models, probe_model};
+use llm_providers_connector::{Endpoint, list_models, probe_model};
 
 fn main() -> Result<(), String> {
     let endpoint = Endpoint { base_url: "http://127.0.0.1:8000/v1".into(), api_key: None };
     for m in list_models(&endpoint)? {
         let probed = probe_model(&endpoint, &m.id)?;
-        println!("{}: context {:?} ({:?}), max_tokens {:?}, efforts {:?}",
-            m.id, probed.context_window, probed.context_source, probed.max_tokens, probed.reasoning_efforts);
-    }
-    if let Some(entry) = catalog_entry("gpt-5-mini") {
-        println!("catalog says: context {:?}, default effort {:?}", entry.context_window, entry.default_reasoning_effort);
+        println!("{}: context {:?}, max_tokens {:?}, efforts {:?}",
+            m.id, probed.context_window, probed.max_tokens, probed.reasoning_efforts);
     }
     Ok(())
 }
 ```
 
-`ProbedModel` reports where each limit comes from (`LimitSource::Endpoint` or
-`LimitSource::Catalog`), so a UI can show "measured" against "assumed". The
-catalog is a short built-in table of public model families (Qwen 3, DeepSeek,
-OpenAI reasoning models, …) with their accepted reasoning efforts and context
-windows; it is a fallback, not a source of truth.
+Each effort is tried with `max_tokens: 1`; efforts the server renders as the
+same prompt (same `prompt_tokens`) are one level, so aliases collapse. What
+`ProbedModel` reports is only what the server itself said: a limit or an
+effort list it did not reveal stays empty. There is no built-in table of
+model families: chat templates differ per deployment, so only the server
+knows.
 
 ## Providers, preferences and prices
 
 A `Provider` is one endpoint plus the models it serves, each with optional
 `ModelPrefs` (max tokens, context window, compaction threshold, reasoning
 effort, the efforts a probe found, price). `ModelPrefs::accepted_efforts`
-gives the efforts to offer for a model: the probed ones, else the catalog's.
+gives the efforts to offer for a model: the probed ones, empty when never probed.
 A `ModelRef { provider, model }` names the model in use.
 `ModelParams::resolve` turns defaults, preferences and the listed context
 window into the concrete parameters of one call.
