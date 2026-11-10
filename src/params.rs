@@ -3,7 +3,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::catalog::catalog_entry;
 use crate::price::Price;
 use crate::provider::ModelRef;
 
@@ -40,15 +39,12 @@ pub struct ModelPrefs {
 }
 
 impl ModelPrefs {
-    /// The efforts `model_id` accepts: the probed ones, else its catalog
-    /// family's; empty when neither knows (any effort may be offered).
-    pub fn accepted_efforts(prefs: Option<&ModelPrefs>, model_id: &str) -> Vec<ReasoningEffort> {
-        match prefs.filter(|p| !p.reasoning_efforts.is_empty()) {
-            Some(p) => p.reasoning_efforts.clone(),
-            None => catalog_entry(model_id)
-                .map(|entry| entry.reasoning_efforts.to_vec())
-                .unwrap_or_default(),
-        }
+    /// The efforts the model accepts, as probed; empty when never probed
+    /// (any effort may be offered).
+    pub fn accepted_efforts(prefs: Option<&ModelPrefs>) -> Vec<ReasoningEffort> {
+        prefs
+            .map(|p| p.reasoning_efforts.clone())
+            .unwrap_or_default()
     }
 }
 
@@ -118,20 +114,16 @@ mod tests {
     }
 
     #[test]
-    fn accepted_efforts_prefer_the_probe_then_the_catalog() {
+    fn accepted_efforts_are_the_probed_ones() {
         let probed = ModelPrefs {
             reasoning_efforts: vec![ReasoningEffort::Low, ReasoningEffort::High],
             ..ModelPrefs::default()
         };
         assert_eq!(
-            ModelPrefs::accepted_efforts(Some(&probed), "anything"),
+            ModelPrefs::accepted_efforts(Some(&probed)),
             vec![ReasoningEffort::Low, ReasoningEffort::High]
         );
-        assert_eq!(
-            ModelPrefs::accepted_efforts(None, "gpt-5"),
-            catalog_entry("gpt-5").unwrap().reasoning_efforts.to_vec()
-        );
-        assert!(ModelPrefs::accepted_efforts(None, "no-such-family").is_empty());
+        assert!(ModelPrefs::accepted_efforts(None).is_empty());
     }
 
     #[test]
