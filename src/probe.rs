@@ -1,9 +1,7 @@
 //! Auto-config for an endpoint that does not list its models' limits
 //! (no `/models` route, no `max_model_len`): which reasoning efforts the
-//! model accepts, and its context window from the catalog.
-//!
-//! The limits an endpoint names when refusing an oversized `max_tokens`
-//! (read from error wording, so indicative) are preferred to the catalog.
+//! model accepts, and the limits it names when refusing an oversized
+//! `max_tokens` (read from error wording, so indicative).
 //! The effort probes ask for `max_tokens: 1`, not 0, which some gateways
 //! refuse.
 //! This module does not handle thinking/non-thinking param combos,
@@ -11,7 +9,6 @@
 //! Studio native routes: its request has no per-model extra params to put
 //! them in yet.
 
-use super::catalog::catalog_entry;
 use super::endpoint::Endpoint;
 use super::params::ReasoningEffort::{self, *};
 use serde::Serialize;
@@ -19,7 +16,7 @@ use serde_json::{Value, json};
 use std::time::Duration;
 
 /// The efforts tried in turn ('none' is the non-thinking path).
-const EFFORT_CANDIDATES: [ReasoningEffort; 5] = [Low, Medium, High, XHigh, Max];
+const EFFORT_CANDIDATES: [ReasoningEffort; 7] = [None, Minimal, Low, Medium, High, XHigh, Max];
 
 /// Asked for in the oversized call: far above any model's limit, so the
 /// endpoint refuses it and, often, says what the limit is.
@@ -28,37 +25,23 @@ const OVERSIZED_MAX_TOKENS: u64 = 1_000_000_000;
 /// Below this, a number in an error message is not a token limit.
 const MIN_LIMIT: u64 = 1024;
 
-/// Where a probed limit comes from.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum LimitSource {
-    /// Named by the endpoint in an error message.
-    Endpoint,
-    /// The model family's entry in the catalog.
-    Catalog,
-}
-
 /// What a probe learned about a model. `None`: nothing said it.
 #[derive(Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProbedModel {
     pub context_window: Option<u64>,
-    pub context_source: Option<LimitSource>,
     pub max_tokens: Option<u64>,
-    /// The efforts the endpoint accepts, distinct ones only; the catalog's
-    /// when the endpoint refused every probe; empty when neither says.
+    /// The efforts the endpoint accepts, distinct ones only; empty when it
+    /// refused every probe.
     pub reasoning_efforts: Vec<ReasoningEffort>,
-    pub efforts_source: Option<LimitSource>,
-    /// The effort to run with: the catalog's default when accepted.
+    /// The effort to run with: `high` when accepted, else the strongest.
     pub default_reasoning_effort: Option<ReasoningEffort>,
 }
 
 /// Probes one `model`. Fails only when the
 /// model cannot be called at all.
 pub fn probe_model(endpoint: &Endpoint, model: &str) -> Result<ProbedModel, String> {
-    let baseline =
-        call(endpoint, model, 1, Option::None)?.map_err(|text| format!("{model}: {text}"))?;
-    let catalog = catalog_entry(model);
+    call(endpoint, model, 1, Option::None)?.map_err(|text| format!("{model}: {text}"))?;
     let mut probed = ProbedModel::default();
 
     let probes: Vec<(ReasoningEffort, Option<u64>)> = std::thread::scope(|scope| {
@@ -82,19 +65,8 @@ pub fn probe_model(endpoint: &Endpoint, model: &str) -> Result<ProbedModel, Stri
         .into_iter()
         .filter_map(|(effort, tokens)| tokens.map(|tokens| (effort, tokens)))
         .collect();
-    if accepted.is_empty() {
-        if let Some(entry) = catalog.filter(|entry| !entry.reasoning_efforts.is_empty()) {
-            probed.reasoning_efforts = entry.reasoning_efforts.to_vec();
-            probed.efforts_source = Some(LimitSource::Catalog);
-        }
-    } else {
-        probed.reasoning_efforts = distinct_efforts(baseline, &accepted);
-        probed.efforts_source = Some(LimitSource::Endpoint);
-    }
-    probed.default_reasoning_effort = default_effort(
-        &probed.reasoning_efforts,
-        catalog.and_then(|entry| entry.default_reasoning_effort),
-    );
+    probed.reasoning_efforts = distinct_efforts(&accepted);
+    probed.default_reasoning_effort = default_effort(&probed.reasoning_efforts);
 
     if let Err(text) = call(endpoint, model, OVERSIZED_MAX_TOKENS, Option::None)? {
         probed.context_window = limit_after(
@@ -115,31 +87,17 @@ pub fn probe_model(endpoint: &Endpoint, model: &str) -> Result<ProbedModel, Stri
         // the message named only the context.
         .filter(|max| Some(*max) != probed.context_window);
     }
-    if probed.context_window.is_some() {
-        probed.context_source = Some(LimitSource::Endpoint);
-    } else if let Some(window) = catalog.and_then(|entry| entry.context_window) {
-        probed.context_window = Some(window);
-        probed.context_source = Some(LimitSource::Catalog);
-    }
     Ok(probed)
 }
 
 /// The probe's dedup: an effort that changes the prompt
 /// (a distinct `prompt_tokens`) is a real level; efforts that map to the same
-/// prompt are one level, the first named kept.
-fn distinct_efforts(baseline: u64, accepted: &[(ReasoningEffort, u64)]) -> Vec<ReasoningEffort> {
-    let impactful: Vec<_> = accepted
-        .iter()
-        .filter(|(_, tokens)| *tokens != baseline)
-        .collect();
-    let pool: Vec<_> = if impactful.is_empty() {
-        accepted.iter().collect()
-    } else {
-        impactful
-    };
+/// prompt are one level, the first named kept. An effort whose prompt matches
+/// the call without one is kept too: it is the endpoint's default level.
+fn distinct_efforts(accepted: &[(ReasoningEffort, u64)]) -> Vec<ReasoningEffort> {
     let mut seen = Vec::new();
     let mut distinct = Vec::new();
-    for (effort, tokens) in pool {
+    for (effort, tokens) in accepted {
         if seen.contains(tokens) {
             continue;
         }
@@ -153,15 +111,12 @@ fn distinct_efforts(baseline: u64, accepted: &[(ReasoningEffort, u64)]) -> Vec<R
     distinct
 }
 
-/// The catalog's default when the endpoint accepts it, else `high`, else the
-/// strongest accepted; none when no effort is accepted.
-fn default_effort(
-    accepted: &[ReasoningEffort],
-    catalog: Option<ReasoningEffort>,
-) -> Option<ReasoningEffort> {
-    catalog
-        .filter(|effort| accepted.contains(effort))
-        .or_else(|| accepted.contains(&High).then_some(High))
+/// `high` when accepted, else the strongest accepted; none when no effort is
+/// accepted.
+fn default_effort(accepted: &[ReasoningEffort]) -> Option<ReasoningEffort> {
+    accepted
+        .contains(&High)
+        .then_some(High)
         .or_else(|| accepted.last().copied())
 }
 
@@ -224,4 +179,23 @@ fn limit_after(text: &str, keys: &[&str]) -> Option<u64> {
                 .filter_map(|word| word.parse::<u64>().ok())
                 .find(|n| *n >= MIN_LIMIT && *n != OVERSIZED_MAX_TOKENS)
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_default_level_is_kept_and_aliases_collapse() {
+        // A Qwen3.8 template: xhigh renders the same prompt as no effort
+        // (its default), and medium and high would be one level.
+        let accepted = [(None, 13), (Low, 41), (Medium, 11), (High, 11), (XHigh, 53)];
+        assert_eq!(distinct_efforts(&accepted), vec![None, Low, Medium, XHigh]);
+    }
+
+    #[test]
+    fn an_endpoint_ignoring_the_field_accepts_every_effort() {
+        let accepted = [(Low, 20), (High, 20)];
+        assert_eq!(distinct_efforts(&accepted), vec![Low, High]);
+    }
 }
