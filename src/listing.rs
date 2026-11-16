@@ -46,3 +46,33 @@ pub fn list_models(endpoint: &Endpoint) -> Result<Vec<ListedModel>, String> {
         })
         .collect())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Read;
+    use std::net::TcpListener;
+
+    // The crate once built ureq without a TLS provider: every https endpoint failed after the TCP
+    // connect, without a handshake. 0x16 is the first byte of a TLS ClientHello record.
+    #[test]
+    fn https_endpoint_gets_a_tls_handshake() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            let mut first = [0u8; 1];
+            socket.read_exact(&mut first).map(|_| first[0]).ok()
+        });
+        let endpoint = Endpoint {
+            base_url: format!("https://127.0.0.1:{port}/v1"),
+            api_key: None,
+        };
+        let err = list_models(&endpoint).unwrap_err();
+        assert_eq!(
+            server.join().unwrap(),
+            Some(0x16),
+            "no TLS handshake, error: {err}"
+        );
+    }
+}

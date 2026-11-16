@@ -1,6 +1,6 @@
 [package]
 name = "llm-providers-connector"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "Sync client for OpenAI-compatible LLM endpoints: streaming chat with tools, model listing and probing, prices, API keys sealed at rest."
@@ -12,5 +12,5 @@ categories = ["api-bindings"]
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-ureq = { version = "3", default-features = false, features = ["json"] }
+ureq = { version = "3", default-features = false, features = ["json", "rustls"] }
 chacha20poly1305 = "0.10"
