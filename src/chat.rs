@@ -33,6 +33,11 @@ pub struct ChatRequest<'a> {
     pub tools: &'a Value,
     pub max_tokens: u32,
     pub reasoning_effort: Option<ReasoningEffort>,
+    /// Provider-specific fields merged into the body last (OpenRouter's
+    /// `provider` routing, `temperature`, ...): a JSON object, or `Null` for
+    /// none. Its keys override the standard ones, so a caller can also pin a
+    /// field this crate sets.
+    pub extra: &'a Value,
 }
 
 /// A tool call as streamed, before the caller parses its arguments.
@@ -75,6 +80,11 @@ fn body(req: &ChatRequest) -> Value {
     if req.tools.as_array().is_some_and(|t| !t.is_empty()) {
         body["tools"] = req.tools.clone();
         body["tool_choice"] = json!("auto");
+    }
+    if let Some(extra) = req.extra.as_object() {
+        for (k, v) in extra {
+            body[k] = v.clone();
+        }
     }
     body
 }
@@ -127,10 +137,30 @@ mod tests {
             tools: &tools,
             max_tokens: 32_000,
             reasoning_effort: Some(ReasoningEffort::XHigh),
+            extra: &Value::Null,
         };
         assert_eq!(
             serde_json::to_string(&body(&req)).unwrap(),
             r#"{"max_tokens":32000,"messages":[{"content":"You are a helpful assistant.","role":"system"},{"content":"hi","role":"user"}],"model":"qwen3.8-27b","reasoning_effort":"xhigh","stream":true,"stream_options":{"include_usage":true},"tool_choice":"auto","tools":[{"function":{"name":"read_file"},"type":"function"}]}"#
         );
+    }
+
+    #[test]
+    fn extra_fields_are_merged_last_and_override() {
+        let messages = [json!({"role": "user", "content": "hi"})];
+        let extra = json!({"provider": {"order": ["deepseek"], "allow_fallbacks": false}, "max_tokens": 10});
+        let req = ChatRequest {
+            model: "m",
+            system_prompt: "s",
+            messages: &messages,
+            tools: &Value::Null,
+            max_tokens: 32_000,
+            reasoning_effort: None,
+            extra: &extra,
+        };
+        let body = body(&req);
+        assert_eq!(body["provider"]["order"], json!(["deepseek"]));
+        assert_eq!(body["max_tokens"], json!(10));
+        assert!(body.get("tools").is_none());
     }
 }
