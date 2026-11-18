@@ -40,7 +40,9 @@ llm-providers-connector = { git = "https://github.com/ikarys/llm-providers-conne
 callback while it runs. The returned `Completion` holds the accumulated text,
 the thinking (reasoning content, when the server sends it), the tool calls with
 their raw argument text, the finish reason and the token counts. `stop` lets
-you cancel a running stream from another thread.
+you cancel a running stream from another thread. `extra` is a JSON object of
+provider-specific fields merged into the request body last (OpenRouter's
+`provider` routing, `temperature`); its keys override the standard ones.
 
 ```rust,no_run
 use std::sync::atomic::AtomicBool;
@@ -58,6 +60,8 @@ fn main() -> Result<(), String> {
         tools: &tools,
         max_tokens: 2048,
         reasoning_effort: Some(ReasoningEffort::Low),
+        // Provider-specific fields merged into the body last, or `json!(null)`.
+        extra: &json!({"temperature": 0.2}),
     };
     let stop = AtomicBool::new(false);
     let done = stream(&endpoint, &req, &stop, &mut |d| match d {
